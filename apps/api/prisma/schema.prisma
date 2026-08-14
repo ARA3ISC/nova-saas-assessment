@@ -7,4 +7,239 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Domain models and RLS policies will be added in later phases.
+enum IdentityStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum OrganizationAccessStatus {
+  PROVISIONING
+  ACTIVE
+  SUSPENDED
+  DISABLED
+}
+
+enum CommercialStatus {
+  DEMO
+  PILOT
+  ACTIVE
+}
+
+enum CompanyStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum BusinessScopeStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum BusinessScopeType {
+  RESTAURANT
+  PROPERTY_DEVELOPMENT
+  CONSTRUCTION
+  EVENT
+}
+
+enum OrganizationProfile {
+  Administrator
+  User
+}
+
+enum MembershipStatus {
+  ACTIVE
+  SUSPENDED
+  REMOVED
+}
+
+model Identity {
+  id              String         @id @default(uuid()) @db.Uuid
+  email           String
+  normalizedEmail String         @unique
+  status          IdentityStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  passwordCredential  PasswordCredential?
+  authSessions        AuthSession[]
+  passwordResetTokens PasswordResetToken[]
+  membership          Membership?
+  platformPrincipal   PlatformPrincipal?
+
+  @@index([email])
+}
+
+model PasswordCredential {
+  id                 String  @id @default(uuid()) @db.Uuid
+  identityId         String  @unique @db.Uuid
+  passwordHash       String
+  mustChangePassword Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  identity Identity @relation(fields: [identityId], references: [id], onDelete: Cascade)
+}
+
+model AuthSession {
+  id                    String    @id @default(uuid()) @db.Uuid
+  identityId            String    @db.Uuid
+  tokenHash             String    @unique
+  createdAt             DateTime  @default(now())
+  lastSeenAt            DateTime  @default(now())
+  expiresAt             DateTime
+  absoluteExpiresAt     DateTime
+  recentAuthenticatedAt DateTime?
+  revokedAt             DateTime?
+
+  identity Identity @relation(fields: [identityId], references: [id], onDelete: Cascade)
+
+  @@index([identityId, revokedAt])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id            String    @id @default(uuid()) @db.Uuid
+  identityId    String    @db.Uuid
+  tokenHash     String    @unique
+  expiresAt     DateTime
+  consumedAt    DateTime?
+  invalidatedAt DateTime?
+  createdAt     DateTime  @default(now())
+
+  identity Identity @relation(fields: [identityId], references: [id], onDelete: Cascade)
+
+  @@index([identityId])
+  @@index([expiresAt])
+}
+
+model AuthenticationThrottle {
+  id                String    @id @default(uuid()) @db.Uuid
+  normalizedAccount String
+  sourceBucket      String
+  failureCount      Int       @default(0)
+  firstFailedAt     DateTime?
+  lastFailedAt      DateTime?
+  lockedUntil       DateTime?
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([normalizedAccount, sourceBucket])
+  @@index([lockedUntil])
+}
+
+model PlatformPrincipal {
+  id         String @id @default(uuid()) @db.Uuid
+  identityId String @unique @db.Uuid
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  identity Identity @relation(fields: [identityId], references: [id], onDelete: Cascade)
+}
+
+model Organization {
+  id               String                   @id @default(uuid()) @db.Uuid
+  name             String
+  accessStatus     OrganizationAccessStatus @default(PROVISIONING)
+  commercialStatus CommercialStatus         @default(DEMO)
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  disabledAt DateTime?
+
+  companies      Company[]
+  memberships    Membership[]
+  ownership      OrganizationOwnership?
+  businessScopes BusinessScope[]
+
+  @@index([accessStatus])
+  @@index([commercialStatus])
+}
+
+model Membership {
+  id             String              @id @default(uuid()) @db.Uuid
+  organizationId String              @db.Uuid
+  identityId     String              @unique @db.Uuid
+  profile        OrganizationProfile
+  status         MembershipStatus    @default(ACTIVE)
+
+  accessEpoch Int @default(0)
+  version     Int @default(1)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  suspendedAt DateTime?
+  removedAt   DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  identity Identity @relation(fields: [identityId], references: [id], onDelete: Cascade)
+
+  ownership OrganizationOwnership?
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, identityId])
+  @@index([organizationId, status])
+  @@index([organizationId, profile])
+}
+
+model OrganizationOwnership {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @unique @db.Uuid
+  membershipId   String @unique @db.Uuid
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  membership Membership @relation(fields: [organizationId, membershipId], references: [organizationId, id], onDelete: Cascade)
+
+  @@unique([organizationId, membershipId])
+}
+
+model Company {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String        @db.Uuid
+  name           String
+  status         CompanyStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  businessScopes BusinessScope[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, name])
+  @@index([organizationId, status])
+}
+
+model BusinessScope {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  companyId      String @db.Uuid
+
+  type               BusinessScopeType
+  name               String
+  normalizedName     String
+  externalIdentifier String?
+  location           String?
+  responsiblePerson  String?
+  status             BusinessScopeStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  company Company @relation(fields: [organizationId, companyId], references: [organizationId, id], onDelete: Cascade)
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, companyId, type, normalizedName, externalIdentifier])
+  @@index([organizationId, companyId, status])
+  @@index([organizationId, normalizedName])
+}
