@@ -56,4 +56,15 @@ export class AuthRepository {
       },
     });
   }
+
+	async findIdentityByEmail(normalizedEmail: string) {
+		return this.prisma.identity.findUnique({
+			where: {
+				normalizedEmail,
+			},
+			include: {
+				passwordCredential: true,
+			},
+		});
+	}
 }

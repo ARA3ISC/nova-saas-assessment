@@ -1,4 +1,7 @@
+import { AuthThrottleService } from './auth.throttle';
 import { Injectable } from '@nestjs/common';
+import { normalizeEmail } from '../domain/email';
+import * as argon2 from 'argon2';
 
 import {
   generateSessionToken,
@@ -10,7 +13,10 @@ const ABSOLUTE_SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly authRepository: AuthRepository) {}
+  constructor(
+    private readonly authRepository: AuthRepository,
+    private readonly authThrottle: AuthThrottleService,
+  ) {}
 
   async createSession(identityId: string): Promise<{
     token: string;
@@ -47,4 +53,40 @@ export class AuthService {
   async revokeSession(token: string): Promise<void> {
     await this.authRepository.revokeSession(token);
   }
+
+	async login(email: string, password: string) {
+		const normalizedEmail = normalizeEmail(email);
+
+    if (
+      await this.authThrottle.isLocked(normalizedEmail, 'login')
+    ) {
+      return null;
+    }
+
+		const identity =
+			await this.authRepository.findIdentityByEmail(normalizedEmail);
+
+		if (
+			!identity ||
+			identity.status !== 'ACTIVE' ||
+			!identity.passwordCredential
+		) {
+			return null;
+		}
+
+		const valid = await argon2.verify(
+      identity.passwordCredential.passwordHash,
+      password,
+    );
+
+    if (!valid) {
+      await this.authThrottle.recordFailure(normalizedEmail, 'login');
+      return null;
+    }
+
+    await this.authThrottle.clearFailures(normalizedEmail, 'login');
+
+
+		return this.createSession(identity.id);
+	}
 }

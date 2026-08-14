@@ -1,3 +1,4 @@
+import { AuthThrottleService } from './auth.throttle';
 import { describe, expect, it, vi } from 'vitest';
 
 import { AuthService } from './auth.service';
@@ -9,7 +10,9 @@ describe('AuthService', () => {
       createSession: vi.fn().mockResolvedValue({}),
     } as unknown as AuthRepository;
 
-    const service = new AuthService(repository);
+    const throttle = {} as AuthThrottleService;
+
+const service = new AuthService(repository, throttle);
 
     const result = await service.createSession('identity-id');
 
@@ -29,7 +32,9 @@ describe('AuthService', () => {
       findValidSession: vi.fn().mockResolvedValue(session),
     } as unknown as AuthRepository;
 
-    const service = new AuthService(repository);
+    const throttle = {} as AuthThrottleService;
+
+const service = new AuthService(repository, throttle);
 
     await expect(service.validateSession('token')).resolves.toEqual(session);
     expect(repository.findValidSession).toHaveBeenCalledWith('token');
@@ -40,7 +45,9 @@ describe('AuthService', () => {
       revokeSession: vi.fn().mockResolvedValue({}),
     } as unknown as AuthRepository;
 
-    const service = new AuthService(repository);
+    const throttle = {} as AuthThrottleService;
+
+const service = new AuthService(repository, throttle);
 
     await service.revokeSession('token');
 
