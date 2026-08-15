@@ -51,4 +51,17 @@ export class PasswordResetRepository {
       },
     });
   }
+
+	async updatePassword(
+		identityId: string,
+		passwordHash: string,
+	): Promise<void> {
+		await this.prisma.passwordCredential.update({
+			where: { identityId },
+			data: {
+				passwordHash,
+				mustChangePassword: false,
+			},
+		});
+	}
 }

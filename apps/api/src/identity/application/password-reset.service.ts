@@ -1,3 +1,4 @@
+import { hashPassword } from '../domain/password';
 import {
   generatePasswordResetToken,
   hashPasswordResetToken,
@@ -37,6 +38,33 @@ export class PasswordResetService {
 		if (!record) {
 			return false;
 		}
+
+		await this.repository.consume(record.id);
+
+		return true;
+	}
+
+	async resetPassword(
+		token: string,
+		newPassword: string,
+	): Promise<boolean> {
+		const tokenHash = hashPasswordResetToken(token);
+
+		const record = await this.repository.findValidToken(
+			tokenHash,
+			new Date(),
+		);
+
+		if (!record) {
+			return false;
+		}
+
+		const passwordHash = await hashPassword(newPassword);
+
+		await this.repository.updatePassword(
+			record.identityId,
+			passwordHash,
+		);
 
 		await this.repository.consume(record.id);
 
