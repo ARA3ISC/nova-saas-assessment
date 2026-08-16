@@ -53,4 +53,41 @@ const service = new AuthService(repository, throttle);
 
     expect(repository.revokeSession).toHaveBeenCalledWith('token');
   });
+
+
+  it('rejects an expired session', async () => {
+    const repository = {
+      findValidSession: vi.fn().mockResolvedValue(null),
+    } as unknown as AuthRepository;
+
+    const throttle = {} as AuthThrottleService;
+
+    const service = new AuthService(repository, throttle);
+
+    await expect(
+      service.validateSession('expired-token'),
+    ).resolves.toBeNull();
+
+    expect(repository.findValidSession).toHaveBeenCalledWith(
+      'expired-token',
+    );
+  });
+
+  it('rejects a revoked session', async () => {
+    const repository = {
+      findValidSession: vi.fn().mockResolvedValue(null),
+    } as unknown as AuthRepository;
+
+    const throttle = {} as AuthThrottleService;
+
+    const service = new AuthService(repository, throttle);
+
+    await expect(
+      service.validateSession('revoked-token'),
+    ).resolves.toBeNull();
+
+    expect(repository.findValidSession).toHaveBeenCalledWith(
+      'revoked-token',
+    );
+  });
 });

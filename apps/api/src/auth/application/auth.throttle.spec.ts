@@ -52,4 +52,72 @@ describe('AuthThrottleService', () => {
       },
     });
   });
+
+	it('records a failed attempt', async () => {
+		const prisma = {
+			authenticationThrottle: {
+				findUnique: vi.fn().mockResolvedValue(null),
+				upsert: vi.fn().mockResolvedValue({}),
+			},
+		} as unknown as PrismaService;
+
+		const service = new AuthThrottleService(prisma);
+
+		await service.recordFailure('user@example.com', 'login');
+
+		expect(prisma.authenticationThrottle.upsert).toHaveBeenCalledWith({
+			where: {
+				normalizedAccount_sourceBucket: {
+					normalizedAccount: 'user@example.com',
+					sourceBucket: 'login',
+				},
+			},
+			create: expect.objectContaining({
+				normalizedAccount: 'user@example.com',
+				sourceBucket: 'login',
+				failureCount: 1,
+				firstFailedAt: expect.any(Date),
+				lastFailedAt: expect.any(Date),
+				lockedUntil: null,
+			}),
+			update: expect.objectContaining({
+				failureCount: 1,
+				lastFailedAt: expect.any(Date),
+				lockedUntil: null,
+			}),
+		});
+	});
+
+	it('locks after the fifth failed attempt', async () => {
+		const prisma = {
+			authenticationThrottle: {
+				findUnique: vi.fn().mockResolvedValue({
+					failureCount: 4,
+					firstFailedAt: new Date(),
+					lastFailedAt: new Date(),
+					lockedUntil: null,
+				}),
+				upsert: vi.fn().mockResolvedValue({}),
+			},
+		} as unknown as PrismaService;
+
+		const service = new AuthThrottleService(prisma);
+
+		await service.recordFailure('user@example.com', 'login');
+
+		expect(prisma.authenticationThrottle.upsert).toHaveBeenCalledWith({
+			where: {
+				normalizedAccount_sourceBucket: {
+					normalizedAccount: 'user@example.com',
+					sourceBucket: 'login',
+				},
+			},
+			create: expect.any(Object),
+			update: expect.objectContaining({
+				failureCount: 5,
+				lastFailedAt: expect.any(Date),
+				lockedUntil: expect.any(Date),
+			}),
+		});
+	});
 });
