@@ -1,7 +1,8 @@
+import { Request, Response } from 'express';
 import { describe, expect, it, vi } from 'vitest';
 
-import { AuthController } from './auth.controller';
 import { AuthService } from '../application/auth.service';
+import { AuthController } from './auth.controller';
 
 describe('AuthController', () => {
   it('logs in and sets the session cookie', async () => {
@@ -17,14 +18,14 @@ describe('AuthController', () => {
 
     const response = {
       cookie: vi.fn(),
-    };
+    } as unknown as Response;
 
     const result = await controller.login(
       {
         email: 'user@example.com',
         password: 'correct-password',
       },
-      response as any,
+      response,
     );
 
     expect(result).toEqual({
@@ -52,7 +53,7 @@ describe('AuthController', () => {
 
     const response = {
       cookie: vi.fn(),
-    };
+    } as unknown as Response;
 
     await expect(
       controller.login(
@@ -60,7 +61,7 @@ describe('AuthController', () => {
           email: 'user@example.com',
           password: 'wrong-password',
         },
-        response as any,
+        response,
       ),
     ).rejects.toThrow('Invalid credentials');
 
@@ -76,17 +77,17 @@ describe('AuthController', () => {
 
     const response = {
       clearCookie: vi.fn(),
-    };
+    } as unknown as Response;
 
     const request = {
       cookies: {
         nova_session: 'session-token',
       },
-    };
+    } as unknown as Request;
 
     const result = await controller.logout(
-      request as any,
-      response as any,
+      request,
+      response,
     );
 
     expect(result).toEqual({
@@ -107,24 +108,26 @@ describe('AuthController', () => {
     );
   });
 
-	it('returns the authenticated session', async () => {
-		const session = {
-			id: 'session-id',
-			identityId: 'identity-id',
-		};
+  it('returns the authenticated session', async () => {
+    const session = {
+      id: 'session-id',
+      identityId: 'identity-id',
+    };
 
-		const authService = {} as AuthService;
+    const authService = {} as AuthService;
 
-		const controller = new AuthController(authService);
+    const controller = new AuthController(authService);
 
-		const request = {
-			authSession: session,
-		};
+    const request = {
+      authSession: session,
+    } as unknown as Parameters<
+      AuthController['me']
+    >[0];
 
-		const result = await controller.me(request as any);
+    const result = await controller.me(request);
 
-		expect(result).toEqual({
-			session,
-		});
-	});
+    expect(result).toEqual({
+      session,
+    });
+  });
 });

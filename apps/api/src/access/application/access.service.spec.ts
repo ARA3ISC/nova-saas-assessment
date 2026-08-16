@@ -34,7 +34,11 @@ describe('AccessService', () => {
       },
     });
 
-    const service = new AccessService(repository as any);
+    const service = new AccessService(
+      repository as unknown as ConstructorParameters<
+        typeof AccessService
+      >[0],
+    );
 
     await expect(
       service.resolveEffectiveAccess('identity-id'),
@@ -60,7 +64,11 @@ describe('AccessService', () => {
 
     repository.findEffectiveAccess.mockResolvedValue(null);
 
-    const service = new AccessService(repository as any);
+    const service = new AccessService(
+      repository as unknown as ConstructorParameters<
+        typeof AccessService
+      >[0],
+    );
 
     await expect(
       service.resolveEffectiveAccess('identity-id'),
@@ -87,7 +95,11 @@ describe('AccessService', () => {
       },
     });
 
-    const service = new AccessService(repository as any);
+    const service = new AccessService(
+      repository as unknown as ConstructorParameters<
+        typeof AccessService
+      >[0],
+    );
 
     await expect(
       service.resolveEffectiveAccess('identity-id'),
@@ -114,7 +126,11 @@ describe('AccessService', () => {
       },
     });
 
-    const service = new AccessService(repository as any);
+    const service = new AccessService(
+      repository as unknown as ConstructorParameters<
+        typeof AccessService
+      >[0],
+    );
 
     await expect(
       service.resolveEffectiveAccess('identity-id'),
@@ -141,7 +157,11 @@ describe('AccessService', () => {
       },
     });
 
-    const service = new AccessService(repository as any);
+    const service = new AccessService(
+      repository as unknown as ConstructorParameters<
+        typeof AccessService
+      >[0],
+    );
 
     await expect(
       service.resolveEffectiveAccess('identity-id'),
