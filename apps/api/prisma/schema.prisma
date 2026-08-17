@@ -53,6 +53,11 @@ enum MembershipStatus {
   REMOVED
 }
 
+enum InvitationKind {
+  INITIAL_OWNER
+  COLLABORATOR
+}
+
 model Identity {
   id              String         @id @default(uuid()) @db.Uuid
   email           String
@@ -153,6 +158,7 @@ model Organization {
   memberships    Membership[]
   ownership      OrganizationOwnership?
   businessScopes BusinessScope[]
+  invitations    Invitation[]
 
   @@index([accessStatus])
   @@index([commercialStatus])
@@ -198,6 +204,29 @@ model OrganizationOwnership {
   membership Membership @relation(fields: [organizationId, membershipId], references: [organizationId, id], onDelete: Cascade)
 
   @@unique([organizationId, membershipId])
+}
+
+model Invitation {
+  id             String         @id @default(uuid()) @db.Uuid
+  organizationId String         @db.Uuid
+  email          String
+  normalizedEmail String
+  tokenHash      String         @unique
+  kind           InvitationKind
+  targetProfile  OrganizationProfile
+  expiresAt      DateTime
+  consumedAt     DateTime?
+  revokedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, normalizedEmail, kind])
+  @@unique([organizationId, id])
+  @@index([organizationId, normalizedEmail])
+  @@index([organizationId, expiresAt])
 }
 
 model Company {
