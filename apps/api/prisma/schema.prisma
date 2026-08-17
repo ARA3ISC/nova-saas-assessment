@@ -223,7 +223,7 @@ model Invitation {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  @@unique([organizationId, normalizedEmail, kind])
+  @@index([organizationId, normalizedEmail, kind])
   @@unique([organizationId, id])
   @@index([organizationId, normalizedEmail])
   @@index([organizationId, expiresAt])
