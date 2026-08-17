@@ -50,16 +50,16 @@ export class InvitationRepository {
     });
   }
 
-  async findByOrganizationEmailAndKind(params: {
-    organizationId: string;
-    normalizedEmail: string;
-    kind: PrismaInvitationKind;
-  }) {
+  async findByOrganizationEmail(
+    organizationId: string,
+    normalizedEmail: string,
+  ) {
     return this.prisma.invitation.findFirst({
       where: {
-        organizationId: params.organizationId,
-        normalizedEmail: params.normalizedEmail,
-        kind: params.kind,
+        organizationId,
+        normalizedEmail,
+        consumedAt: null,
+        revokedAt: null,
       },
       orderBy: {
         createdAt: 'desc',

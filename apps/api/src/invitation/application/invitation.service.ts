@@ -15,11 +15,11 @@ import { InvitationRepository } from '../infrastructure/invitation.repository';
 const INVITATION_TTL_MS =
   7 * 24 * 60 * 60 * 1000;
 
-  type InvitationRepositoryPort = Pick<
+type InvitationRepositoryPort = Pick<
   InvitationRepository,
   | 'create'
   | 'findValidToken'
-  | 'findByOrganizationEmailAndKind'
+  | 'findByOrganizationEmail'
   | 'consume'
   | 'revoke'
   | 'revokePendingForOrganizationEmailAndKind'
@@ -29,7 +29,7 @@ const INVITATION_TTL_MS =
 export class InvitationService {
   constructor(
     private readonly repository: InvitationRepositoryPort,
-  ) {}
+  ) { }
 
   async createInvitation(params: {
     organizationId: string;
@@ -51,11 +51,10 @@ export class InvitationService {
       normalizeInvitationEmail(params.email);
 
     const existing =
-      await this.repository.findByOrganizationEmailAndKind({
-        organizationId: params.organizationId,
+      await this.repository.findByOrganizationEmail(
+        params.organizationId,
         normalizedEmail,
-        kind: params.kind,
-      });
+      );
 
     if (
       existing &&

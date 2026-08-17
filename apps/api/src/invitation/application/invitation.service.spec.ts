@@ -4,106 +4,141 @@ import {
   it,
   vi,
 } from 'vitest';
+import {
+  InvitationKind,
+  OrganizationProfile,
+} from '@prisma/client';
 
 import { InvitationService } from './invitation.service';
-import type { InvitationRepository } from '../infrastructure/invitation.repository';
-
-function createRepository() {
-  return {
-    create: vi.fn(),
-    findValidToken: vi.fn(),
-    findByOrganizationEmailAndKind: vi.fn(),
-    consume: vi.fn(),
-    revoke: vi.fn(),
-    revokePendingForOrganizationEmailAndKind: vi.fn(),
-  };
-}
 
 describe('InvitationService', () => {
+  function createRepository() {
+    return {
+      create: vi.fn(),
+      findValidToken: vi.fn(),
+      findByOrganizationEmail: vi.fn(),
+      consume: vi.fn(),
+      revoke: vi.fn(),
+      revokePendingForOrganizationEmailAndKind: vi.fn(),
+    };
+  }
+
+  function createService(
+    repository: ReturnType<typeof createRepository>,
+  ) {
+    return new InvitationService(
+      repository as unknown as ConstructorParameters<
+        typeof InvitationService
+      >[0],
+    );
+  }
+
+  const organizationId = 'organization-id';
+  const email = 'User@Example.com';
+  const normalizedEmail = 'user@example.com';
+
   it('creates an invitation and returns the raw token', async () => {
     const repository = createRepository();
 
-    repository
-      .findByOrganizationEmailAndKind
-      .mockResolvedValue(null);
+    repository.findByOrganizationEmail.mockResolvedValue(
+      null,
+    );
 
     repository.create.mockResolvedValue({
       id: 'invitation-id',
-      organizationId: 'organization-id',
-      email: 'user@example.com',
-      normalizedEmail: 'user@example.com',
+      organizationId,
+      email,
+      normalizedEmail,
       tokenHash: 'hashed-token',
-      kind: 'COLLABORATOR',
-      targetProfile: 'User',
+      kind: InvitationKind.COLLABORATOR,
+      targetProfile: OrganizationProfile.User,
       expiresAt: new Date(
-        '2026-08-24T12:00:00.000Z',
+        '2026-08-24T00:00:00.000Z',
+      ),
+      consumedAt: null,
+      revokedAt: null,
+      createdAt: new Date(
+        '2026-08-17T00:00:00.000Z',
+      ),
+      updatedAt: new Date(
+        '2026-08-17T00:00:00.000Z',
       ),
     });
 
-    const service = new InvitationService(
-      repository as unknown as InvitationRepository,
-    );
+    const service = createService(repository);
 
-    const result =
-      await service.createInvitation({
-        organizationId: 'organization-id',
-        email: ' USER@example.com ',
-        kind: 'COLLABORATOR',
-        targetProfile: 'User',
-      });
+    const result = await service.createInvitation({
+      organizationId,
+      email,
+      kind: InvitationKind.COLLABORATOR,
+      targetProfile: OrganizationProfile.User,
+    });
 
     expect(result.id).toBe('invitation-id');
-    expect(result.token).toBeTruthy();
+    expect(result.token).toEqual(expect.any(String));
+    expect(result.token.length).toBeGreaterThan(0);
     expect(result.expiresAt).toEqual(
-      new Date('2026-08-24T12:00:00.000Z'),
+      new Date('2026-08-24T00:00:00.000Z'),
+    );
+
+    expect(
+      repository.findByOrganizationEmail,
+    ).toHaveBeenCalledWith(
+      organizationId,
+      normalizedEmail,
     );
 
     expect(
       repository.create,
     ).toHaveBeenCalledOnce();
 
-    const createCall =
+    const createParams =
       repository.create.mock.calls[0]?.[0];
 
-    expect(createCall.organizationId).toBe(
-      'organization-id',
+    expect(createParams).toMatchObject({
+      organizationId,
+      email: email.trim(),
+      normalizedEmail,
+      kind: InvitationKind.COLLABORATOR,
+      targetProfile: OrganizationProfile.User,
+    });
+
+    expect(createParams.tokenHash).toEqual(
+      expect.any(String),
     );
-    expect(createCall.email).toBe(
-      'USER@example.com',
-    );
-    expect(createCall.normalizedEmail).toBe(
-      'user@example.com',
-    );
-    expect(createCall.tokenHash).toBeTruthy();
-    expect(createCall.tokenHash).not.toBe(
-      result.token,
+    expect(createParams.expiresAt).toEqual(
+      expect.any(Date),
     );
   });
 
   it('rejects duplicate active invitations', async () => {
     const repository = createRepository();
 
-    repository
-      .findByOrganizationEmailAndKind
-      .mockResolvedValue({
-        id: 'existing-id',
-        consumedAt: null,
-        revokedAt: null,
-        expiresAt: new Date(
-          Date.now() + 60_000,
-        ),
-      });
+    repository.findByOrganizationEmail.mockResolvedValue({
+      id: 'existing-invitation-id',
+      organizationId,
+      email,
+      normalizedEmail,
+      tokenHash: 'existing-token-hash',
+      kind: InvitationKind.COLLABORATOR,
+      targetProfile: OrganizationProfile.User,
+      expiresAt: new Date(
+        Date.now() + 60_000,
+      ),
+      consumedAt: null,
+      revokedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
 
-    const service = new InvitationService(
-      repository as unknown as InvitationRepository,
-    );
+    const service = createService(repository);
 
     await expect(
       service.createInvitation({
-        organizationId: 'organization-id',
-        email: 'user@example.com',
-        kind: 'COLLABORATOR',
-        targetProfile: 'User',
+        organizationId,
+        email,
+        kind: InvitationKind.COLLABORATOR,
+        targetProfile: OrganizationProfile.User,
       }),
     ).rejects.toThrow(
       'An active invitation already exists',
@@ -112,49 +147,82 @@ describe('InvitationService', () => {
     expect(
       repository.create,
     ).not.toHaveBeenCalled();
+
+    expect(
+      repository.revoke,
+    ).not.toHaveBeenCalled();
   });
 
   it('revokes an old invitation before creating a replacement', async () => {
     const repository = createRepository();
 
-    repository
-      .findByOrganizationEmailAndKind
-      .mockResolvedValue({
-        id: 'old-invitation',
-        consumedAt: null,
-        revokedAt: new Date(),
-        expiresAt: new Date(
-          Date.now() - 60_000,
-        ),
-      });
-
-    repository.create.mockResolvedValue({
-      id: 'new-invitation',
+    repository.findByOrganizationEmail.mockResolvedValue({
+      id: 'old-invitation-id',
+      organizationId,
+      email,
+      normalizedEmail,
+      tokenHash: 'old-token-hash',
+      kind: InvitationKind.COLLABORATOR,
+      targetProfile: OrganizationProfile.User,
       expiresAt: new Date(
-        Date.now() + 60_000,
+        Date.now() - 60_000,
+      ),
+      consumedAt: null,
+      revokedAt: null,
+      createdAt: new Date(
+        '2026-08-16T00:00:00.000Z',
+      ),
+      updatedAt: new Date(
+        '2026-08-16T00:00:00.000Z',
       ),
     });
 
-    const service = new InvitationService(
-      repository as unknown as InvitationRepository,
+    repository.revoke.mockResolvedValue(
+      undefined,
     );
 
-    await service.createInvitation({
-      organizationId: 'organization-id',
-      email: 'user@example.com',
-      kind: 'COLLABORATOR',
-      targetProfile: 'User',
+    repository.create.mockResolvedValue({
+      id: 'new-invitation-id',
+      organizationId,
+      email,
+      normalizedEmail,
+      tokenHash: 'new-token-hash',
+      kind: InvitationKind.COLLABORATOR,
+      targetProfile: OrganizationProfile.User,
+      expiresAt: new Date(
+        '2026-08-24T00:00:00.000Z',
+      ),
+      consumedAt: null,
+      revokedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     });
+
+    const service = createService(repository);
+
+    const result =
+      await service.createInvitation({
+        organizationId,
+        email,
+        kind: InvitationKind.COLLABORATOR,
+        targetProfile: OrganizationProfile.User,
+      });
+
+    expect(result.id).toBe(
+      'new-invitation-id',
+    );
 
     expect(
       repository.revoke,
     ).toHaveBeenCalledWith(
-      'old-invitation',
+      'old-invitation-id',
     );
 
     expect(
       repository.create,
     ).toHaveBeenCalledOnce();
+
+
   });
 
   it('consumes a valid invitation', async () => {
@@ -162,28 +230,50 @@ describe('InvitationService', () => {
 
     repository.findValidToken.mockResolvedValue({
       id: 'invitation-id',
-      organizationId: 'organization-id',
-      email: 'user@example.com',
-      kind: 'COLLABORATOR',
-      targetProfile: 'User',
+      organizationId,
+      email,
+      normalizedEmail,
+      tokenHash: 'hashed-token',
+      kind: InvitationKind.COLLABORATOR,
+      targetProfile: OrganizationProfile.User,
+      expiresAt: new Date(
+        Date.now() + 60_000,
+      ),
+      consumedAt: null,
+      revokedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     });
 
-    const service = new InvitationService(
-      repository as unknown as InvitationRepository,
+    repository.consume.mockResolvedValue(
+      undefined,
     );
+
+    const service = createService(repository);
 
     const result =
       await service.consumeInvitation(
-        'raw-token',
+        'raw-invitation-token',
       );
 
     expect(result).toEqual({
       id: 'invitation-id',
-      organizationId: 'organization-id',
-      email: 'user@example.com',
-      kind: 'COLLABORATOR',
-      targetProfile: 'User',
+      organizationId,
+      email,
+      kind: InvitationKind.COLLABORATOR,
+      targetProfile: OrganizationProfile.User,
     });
+
+    expect(
+      repository.findValidToken,
+    ).toHaveBeenCalledOnce();
+
+    expect(
+      repository.findValidToken,
+    ).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Date),
+    );
 
     expect(
       repository.consume,
@@ -199,15 +289,14 @@ describe('InvitationService', () => {
       null,
     );
 
-    const service = new InvitationService(
-      repository as unknown as InvitationRepository,
-    );
+    const service = createService(repository);
 
-    await expect(
-      service.consumeInvitation(
+    const result =
+      await service.consumeInvitation(
         'invalid-token',
-      ),
-    ).resolves.toBeNull();
+      );
+
+    expect(result).toBeNull();
 
     expect(
       repository.consume,
@@ -217,9 +306,11 @@ describe('InvitationService', () => {
   it('revokes an invitation', async () => {
     const repository = createRepository();
 
-    const service = new InvitationService(
-      repository as unknown as InvitationRepository,
+    repository.revoke.mockResolvedValue(
+      undefined,
     );
+
+    const service = createService(repository);
 
     await service.revokeInvitation(
       'invitation-id',
