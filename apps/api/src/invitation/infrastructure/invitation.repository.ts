@@ -1,16 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import {
-  InvitationKind as PrismaInvitationKind,
-  OrganizationProfile,
-} from '@prisma/client';
+import { InvitationKind as PrismaInvitationKind, OrganizationProfile } from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class InvitationRepository {
-  constructor(
-    private readonly prisma: PrismaService,
-  ) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(params: {
     organizationId: string;
@@ -34,10 +29,7 @@ export class InvitationRepository {
     });
   }
 
-  async findValidToken(
-    tokenHash: string,
-    now: Date,
-  ) {
+  async findValidToken(tokenHash: string, now: Date) {
     return this.prisma.invitation.findFirst({
       where: {
         tokenHash,
@@ -50,10 +42,7 @@ export class InvitationRepository {
     });
   }
 
-  async findByOrganizationEmail(
-    organizationId: string,
-    normalizedEmail: string,
-  ) {
+  async findByOrganizationEmail(organizationId: string, normalizedEmail: string) {
     return this.prisma.invitation.findFirst({
       where: {
         organizationId,
@@ -85,13 +74,11 @@ export class InvitationRepository {
     });
   }
 
-  async revokePendingForOrganizationEmailAndKind(
-    params: {
-      organizationId: string;
-      normalizedEmail: string;
-      kind: PrismaInvitationKind;
-    },
-  ): Promise<void> {
+  async revokePendingForOrganizationEmailAndKind(params: {
+    organizationId: string;
+    normalizedEmail: string;
+    kind: PrismaInvitationKind;
+  }): Promise<void> {
     await this.prisma.invitation.updateMany({
       where: {
         organizationId: params.organizationId,

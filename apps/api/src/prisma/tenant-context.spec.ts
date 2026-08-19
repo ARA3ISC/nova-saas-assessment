@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  validateTenantContext,
-} from './tenant-context';
+import { validateTenantContext } from './tenant-context';
 
 describe('tenant context', () => {
   it('accepts a valid context', () => {

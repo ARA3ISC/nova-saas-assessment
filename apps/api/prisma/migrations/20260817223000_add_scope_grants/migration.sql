@@ -1,0 +1,15 @@
+ALTER TABLE "Invitation" ADD COLUMN "companyIds" JSONB NOT NULL DEFAULT '[]';
+ALTER TABLE "Invitation" ADD COLUMN "businessScopeIds" JSONB NOT NULL DEFAULT '[]';
+CREATE TABLE "CompanyGrant" ("id" UUID NOT NULL, "organizationId" UUID NOT NULL, "membershipId" UUID NOT NULL, "companyId" UUID NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "CompanyGrant_pkey" PRIMARY KEY ("id"));
+CREATE UNIQUE INDEX "CompanyGrant_organizationId_membershipId_companyId_key" ON "CompanyGrant"("organizationId", "membershipId", "companyId");
+ALTER TABLE "CompanyGrant" ADD CONSTRAINT "CompanyGrant_organizationId_membershipId_fkey" FOREIGN KEY ("organizationId", "membershipId") REFERENCES "Membership"("organizationId", "id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "CompanyGrant" ADD CONSTRAINT "CompanyGrant_organizationId_companyId_fkey" FOREIGN KEY ("organizationId", "companyId") REFERENCES "Company"("organizationId", "id") ON DELETE CASCADE ON UPDATE CASCADE;
+CREATE TABLE "BusinessScopeGrant" ("id" UUID NOT NULL, "organizationId" UUID NOT NULL, "membershipId" UUID NOT NULL, "businessScopeId" UUID NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "BusinessScopeGrant_pkey" PRIMARY KEY ("id"));
+CREATE UNIQUE INDEX "BusinessScopeGrant_organizationId_membershipId_businessScopeId_key" ON "BusinessScopeGrant"("organizationId", "membershipId", "businessScopeId");
+ALTER TABLE "BusinessScopeGrant" ADD CONSTRAINT "BusinessScopeGrant_organizationId_membershipId_fkey" FOREIGN KEY ("organizationId", "membershipId") REFERENCES "Membership"("organizationId", "id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "BusinessScopeGrant" ADD CONSTRAINT "BusinessScopeGrant_organizationId_businessScopeId_fkey" FOREIGN KEY ("organizationId", "businessScopeId") REFERENCES "BusinessScope"("organizationId", "id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "CompanyGrant" ENABLE ROW LEVEL SECURITY; ALTER TABLE "CompanyGrant" FORCE ROW LEVEL SECURITY;
+ALTER TABLE "BusinessScopeGrant" ENABLE ROW LEVEL SECURITY; ALTER TABLE "BusinessScopeGrant" FORCE ROW LEVEL SECURITY;
+CREATE POLICY company_grant_tenant_isolation ON "CompanyGrant" AS PERMISSIVE FOR ALL TO nova_app USING ("organizationId" = NULLIF(current_setting('app.organization_id', true), '')::uuid) WITH CHECK ("organizationId" = NULLIF(current_setting('app.organization_id', true), '')::uuid);
+CREATE POLICY business_scope_grant_tenant_isolation ON "BusinessScopeGrant" AS PERMISSIVE FOR ALL TO nova_app USING ("organizationId" = NULLIF(current_setting('app.organization_id', true), '')::uuid) WITH CHECK ("organizationId" = NULLIF(current_setting('app.organization_id', true), '')::uuid);
+GRANT SELECT, INSERT, UPDATE, DELETE ON "CompanyGrant", "BusinessScopeGrant" TO nova_app;

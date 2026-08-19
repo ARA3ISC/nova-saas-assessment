@@ -10,9 +10,7 @@ describe('AuthService.login', () => {
         id: 'identity-id',
         status: 'ACTIVE',
         passwordCredential: {
-          passwordHash: await import('argon2').then((argon2) =>
-            argon2.hash('correct-password'),
-          ),
+          passwordHash: await import('argon2').then((argon2) => argon2.hash('correct-password')),
         },
       }),
       createSession: vi.fn().mockResolvedValue({}),
@@ -21,20 +19,15 @@ describe('AuthService.login', () => {
     const throttle = {
       isLocked: vi.fn().mockResolvedValue(false),
       recordFailure: vi.fn().mockResolvedValue(undefined),
-      clearFailures: vi.fn().mockResolvedValue(undefined),
+      clearAccountFailures: vi.fn().mockResolvedValue(undefined),
     } as unknown as AuthThrottleService;
 
     const service = new AuthService(repository, throttle);
 
-    const result = await service.login(
-      ' User@Example.com ',
-      'correct-password',
-    );
+    const result = await service.login(' User@Example.com ', 'correct-password', 'source-a');
 
     expect(result).not.toBeNull();
-    expect(repository.findIdentityByEmail).toHaveBeenCalledWith(
-      'user@example.com',
-    );
+    expect(repository.findIdentityByEmail).toHaveBeenCalledWith('user@example.com');
   });
 
   it('rejects an invalid password', async () => {
@@ -43,9 +36,7 @@ describe('AuthService.login', () => {
         id: 'identity-id',
         status: 'ACTIVE',
         passwordCredential: {
-          passwordHash: await import('argon2').then((argon2) =>
-            argon2.hash('correct-password'),
-          ),
+          passwordHash: await import('argon2').then((argon2) => argon2.hash('correct-password')),
         },
       }),
     } as unknown as AuthRepository;
@@ -53,14 +44,11 @@ describe('AuthService.login', () => {
     const throttle = {
       isLocked: vi.fn().mockResolvedValue(false),
       recordFailure: vi.fn().mockResolvedValue(undefined),
-      clearFailures: vi.fn().mockResolvedValue(undefined),
+      clearAccountFailures: vi.fn().mockResolvedValue(undefined),
     } as unknown as AuthThrottleService;
     const service = new AuthService(repository, throttle);
 
-    const result = await service.login(
-      'user@example.com',
-      'wrong-password',
-    );
+    const result = await service.login('user@example.com', 'wrong-password', 'source-a');
 
     expect(result).toBeNull();
   });
@@ -73,14 +61,11 @@ describe('AuthService.login', () => {
     const throttle = {
       isLocked: vi.fn().mockResolvedValue(false),
       recordFailure: vi.fn().mockResolvedValue(undefined),
-      clearFailures: vi.fn().mockResolvedValue(undefined),
+      clearAccountFailures: vi.fn().mockResolvedValue(undefined),
     } as unknown as AuthThrottleService;
     const service = new AuthService(repository, throttle);
 
-    const result = await service.login(
-      'unknown@example.com',
-      'anything',
-    );
+    const result = await service.login('unknown@example.com', 'anything', 'source-a');
 
     expect(result).toBeNull();
   });
@@ -95,19 +80,16 @@ describe('AuthService.login', () => {
         },
       }),
     } as unknown as AuthRepository;
-    
+
     const throttle = {
       isLocked: vi.fn().mockResolvedValue(false),
       recordFailure: vi.fn().mockResolvedValue(undefined),
-      clearFailures: vi.fn().mockResolvedValue(undefined),
+      clearAccountFailures: vi.fn().mockResolvedValue(undefined),
     } as unknown as AuthThrottleService;
 
     const service = new AuthService(repository, throttle);
 
-    const result = await service.login(
-      'user@example.com',
-      'correct-password',
-    );
+    const result = await service.login('user@example.com', 'correct-password', 'source-a');
 
     expect(result).toBeNull();
   });

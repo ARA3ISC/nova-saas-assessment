@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 
 const TOKEN_BYTES = 32;
+export const PASSWORD_RESET_TOKEN_TTL_MS = 30 * 60 * 1000;
 
 export function generatePasswordResetToken(): string {
   return randomBytes(TOKEN_BYTES).toString('base64url');

@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  hashPassword,
-  validatePassword,
-  verifyPassword,
-} from './password';
+import { hashPassword, validatePassword, verifyPassword } from './password';
 
 describe('password domain', () => {
   it('rejects passwords shorter than 15 Unicode characters', () => {
@@ -14,7 +10,11 @@ describe('password domain', () => {
   });
 
   it('accepts a password with exactly 15 Unicode characters', () => {
-    expect(() => validatePassword('123456789012345')).not.toThrow();
+    expect(() => validatePassword('abcdefghijklmno')).not.toThrow();
+  });
+
+  it('rejects a commonly compromised password', () => {
+    expect(() => validatePassword('passwordpassword')).toThrow('commonly compromised');
   });
 
   it('counts Unicode characters rather than UTF-16 code units', () => {
@@ -41,9 +41,7 @@ describe('password domain', () => {
   it('rejects an incorrect password', async () => {
     const hash = await hashPassword('a-secure-password-123');
 
-    await expect(
-      verifyPassword('wrong-password-123', hash),
-    ).resolves.toBe(false);
+    await expect(verifyPassword('wrong-password-123', hash)).resolves.toBe(false);
   });
 
   it('generates a different hash for the same password', async () => {
@@ -55,4 +53,3 @@ describe('password domain', () => {
     expect(first).not.toBe(second);
   });
 });
-

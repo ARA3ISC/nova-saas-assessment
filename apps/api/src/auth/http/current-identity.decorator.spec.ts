@@ -1,7 +1,4 @@
-import {
-  ExecutionContext,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { describe, expect, it } from 'vitest';
 
 import { getCurrentIdentity } from './current-identity.decorator';
@@ -32,8 +29,6 @@ describe('CurrentIdentity', () => {
       }),
     } as unknown as ExecutionContext;
 
-    expect(() => getCurrentIdentity(context)).toThrow(
-      UnauthorizedException,
-    );
+    expect(() => getCurrentIdentity(context)).toThrow(UnauthorizedException);
   });
 });

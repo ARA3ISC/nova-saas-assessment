@@ -1,7 +1,4 @@
-import {
-  ForbiddenException,
-  Injectable,
-} from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 
 import { AccessRepository } from '../infrastructure/access.repository';
 
@@ -11,23 +8,22 @@ export type EffectiveAccess = {
   membershipId: string;
   profile: 'Administrator' | 'User';
   accessEpoch: number;
+  capabilities?: string[];
+  companyIds?: string[];
+  businessScopeIds?: string[];
+  organizationWideAccess?: boolean;
 };
 
 @Injectable()
 export class AccessService {
-  constructor(
-    private readonly repository: AccessRepository,
-  ) {}
+  constructor(private readonly repository: AccessRepository) {}
 
-  async resolveEffectiveAccess(
-    identityId: string,
-  ): Promise<EffectiveAccess> {
+  async resolveEffectiveAccess(identityId: string): Promise<EffectiveAccess> {
     if (!identityId) {
       throw new ForbiddenException('Access denied');
     }
 
-    const membership =
-      await this.repository.findEffectiveAccess(identityId);
+    const membership = await this.repository.findEffectiveAccess(identityId);
 
     if (!membership) {
       throw new ForbiddenException('Access denied');
@@ -51,6 +47,12 @@ export class AccessService {
       membershipId: membership.id,
       profile: membership.profile,
       accessEpoch: membership.accessEpoch,
+      organizationWideAccess: Boolean(membership.organizationWideAccess),
+      capabilities: (membership.capabilityGrants ?? []).map((grant) => grant.capability),
+      companyIds: (membership.companyGrants ?? []).map((grant) => grant.companyId),
+      businessScopeIds: (membership.businessScopeGrants ?? []).map(
+        (grant) => grant.businessScopeId,
+      ),
     };
   }
 }

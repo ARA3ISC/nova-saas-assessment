@@ -13,15 +13,9 @@ describe('withTenantContext', () => {
     } as unknown as Prisma.TransactionClient;
 
     const prisma = {
-      $transaction: vi.fn(
-        async (
-          callback: (
-            tx: Prisma.TransactionClient,
-          ) => Promise<unknown>,
-        ) => {
-          return callback(transaction);
-        },
-      ),
+      $transaction: vi.fn(async (callback: (tx: Prisma.TransactionClient) => Promise<unknown>) => {
+        return callback(transaction);
+      }),
     } as unknown as PrismaService;
 
     const callback = vi.fn().mockResolvedValue('result');
@@ -39,7 +33,7 @@ describe('withTenantContext', () => {
     expect(result).toBe('result');
 
     expect(prisma.$transaction).toHaveBeenCalledOnce();
-    expect(executeRaw).toHaveBeenCalledTimes(3);
+    expect(executeRaw).toHaveBeenCalledTimes(4);
     expect(callback).toHaveBeenCalledOnce();
     expect(callback).toHaveBeenCalledWith(transaction);
   });

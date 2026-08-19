@@ -27,6 +27,9 @@ jobs:
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/nova?schema=public
       DATABASE_URL_RUNTIME: postgresql://nova_app:nova_app@localhost:5432/nova?schema=public
+      PLATFORM_BOOTSTRAP_TOKEN: synthetic-ci-bootstrap-token
+      PLATFORM_BOOTSTRAP_EMAIL: platform.admin@example.test
+      PLATFORM_BOOTSTRAP_PASSWORD: Synthetic demo password 2026
 
     steps:
       - name: Checkout
@@ -45,6 +48,12 @@ jobs:
       - name: Apply database migrations
         run: npx prisma migrate deploy --schema=apps/api/prisma/schema.prisma
 
+      - name: Seed deterministic browser-test data
+        run: npm run prisma:seed -w @nova/api
+
+      - name: Securely bootstrap synthetic Platform Administrator
+        run: npm run platform:bootstrap -w @nova/api
+
       - name: Lint
         run: npm run lint
 
@@ -56,3 +65,16 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: End-to-end browser tests
+        run: npm run test:e2e
+        env:
+          API_HOST: 127.0.0.1
+          API_PORT: 3001
+          WEB_PORT: 3000
+          API_INTERNAL_URL: http://127.0.0.1:3001
+          PLAYWRIGHT_API_BASE_URL: http://127.0.0.1:3001
+          PLAYWRIGHT_WEB_BASE_URL: http://127.0.0.1:3000

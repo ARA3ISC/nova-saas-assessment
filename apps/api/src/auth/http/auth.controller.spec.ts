@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { AuthService } from '../application/auth.service';
 import { AuthController } from './auth.controller';
+import { SESSION_COOKIE_NAME } from './session-cookie';
 
 describe('AuthController', () => {
   it('logs in and sets the session cookie', async () => {
@@ -11,6 +12,7 @@ describe('AuthController', () => {
         token: 'session-token',
         expiresAt: new Date('2026-09-01T00:00:00.000Z'),
         absoluteExpiresAt: new Date('2026-10-01T00:00:00.000Z'),
+        mustChangePassword: false,
       }),
     } as unknown as AuthService;
 
@@ -25,21 +27,24 @@ describe('AuthController', () => {
         email: 'user@example.com',
         password: 'correct-password',
       },
+      { ip: '127.0.0.1' } as unknown as Parameters<AuthController['login']>[1],
       response,
     );
 
     expect(result).toEqual({
       expiresAt: new Date('2026-09-01T00:00:00.000Z'),
       absoluteExpiresAt: new Date('2026-10-01T00:00:00.000Z'),
+      mustChangePassword: false,
     });
 
     expect(response.cookie).toHaveBeenCalledWith(
-      'nova_session',
+      SESSION_COOKIE_NAME,
       'session-token',
       expect.objectContaining({
         httpOnly: true,
-        sameSite: 'lax',
+        sameSite: 'strict',
         path: '/',
+        expires: new Date('2026-10-01T00:00:00.000Z'),
       }),
     );
   });
@@ -61,6 +66,7 @@ describe('AuthController', () => {
           email: 'user@example.com',
           password: 'wrong-password',
         },
+        { ip: '127.0.0.1' } as unknown as Parameters<AuthController['login']>[1],
         response,
       ),
     ).rejects.toThrow('Invalid credentials');
@@ -81,28 +87,23 @@ describe('AuthController', () => {
 
     const request = {
       cookies: {
-        nova_session: 'session-token',
+        [SESSION_COOKIE_NAME]: 'session-token',
       },
     } as unknown as Request;
 
-    const result = await controller.logout(
-      request,
-      response,
-    );
+    const result = await controller.logout(request, response);
 
     expect(result).toEqual({
       success: true,
     });
 
-    expect(authService.revokeSession).toHaveBeenCalledWith(
-      'session-token',
-    );
+    expect(authService.revokeSession).toHaveBeenCalledWith('session-token');
 
     expect(response.clearCookie).toHaveBeenCalledWith(
-      'nova_session',
+      SESSION_COOKIE_NAME,
       expect.objectContaining({
         httpOnly: true,
-        sameSite: 'lax',
+        sameSite: 'strict',
         path: '/',
       }),
     );
@@ -112,22 +113,31 @@ describe('AuthController', () => {
     const session = {
       id: 'session-id',
       identityId: 'identity-id',
+      tokenHash: 'must-not-leave-the-api',
+      expiresAt: new Date('2026-09-01T00:00:00.000Z'),
+      absoluteExpiresAt: new Date('2026-10-01T00:00:00.000Z'),
     };
 
-    const authService = {} as AuthService;
+    const identity = { id: 'identity-id', email: 'member@example.test' };
+    const authService = {
+      getIdentityContext: vi.fn().mockResolvedValue(identity),
+    } as unknown as AuthService;
 
     const controller = new AuthController(authService);
 
     const request = {
       authSession: session,
-    } as unknown as Parameters<
-      AuthController['me']
-    >[0];
+    } as unknown as Parameters<AuthController['me']>[0];
 
     const result = await controller.me(request);
 
     expect(result).toEqual({
-      session,
+      session: {
+        expiresAt: session.expiresAt,
+        absoluteExpiresAt: session.absoluteExpiresAt,
+      },
+      identity,
+      mustChangePassword: false,
     });
   });
 });

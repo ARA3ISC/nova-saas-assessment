@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: nova
     ports:
-      - "5432:5432"
+      - '5432:5432'
     volumes:
       - nova-postgres-data:/var/lib/postgresql/data
 

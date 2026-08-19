@@ -20,6 +20,10 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
+    {
+      name: 'mobile-chromium',
+      use: { ...devices['Pixel 5'] },
+    },
   ],
   webServer: [
     {
@@ -37,7 +41,7 @@ export default defineConfig({
       },
     },
     {
-      command: 'npm run start -w @nova/web',
+      command: `npx next start ../../apps/web --port ${webPort}`,
       url: webBaseUrl,
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,

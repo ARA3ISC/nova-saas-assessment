@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  generatePasswordResetToken,
-  hashPasswordResetToken,
-} from './password-reset';
+import { generatePasswordResetToken, hashPasswordResetToken } from './password-reset';
 
 describe('password reset domain', () => {
   it('generates a token', () => {
@@ -14,17 +11,13 @@ describe('password reset domain', () => {
   });
 
   it('generates different tokens', () => {
-    expect(generatePasswordResetToken()).not.toBe(
-      generatePasswordResetToken(),
-    );
+    expect(generatePasswordResetToken()).not.toBe(generatePasswordResetToken());
   });
 
   it('hashes a token deterministically', () => {
     const token = generatePasswordResetToken();
 
-    expect(hashPasswordResetToken(token)).toBe(
-      hashPasswordResetToken(token),
-    );
+    expect(hashPasswordResetToken(token)).toBe(hashPasswordResetToken(token));
   });
 
   it('does not expose the raw token in the hash', () => {

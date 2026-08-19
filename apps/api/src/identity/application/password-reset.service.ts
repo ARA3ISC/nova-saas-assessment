@@ -2,15 +2,12 @@ import { hashPassword } from '../domain/password';
 import {
   generatePasswordResetToken,
   hashPasswordResetToken,
+  PASSWORD_RESET_TOKEN_TTL_MS,
 } from '../domain/password-reset';
 import { PasswordResetRepository } from '../infrastructure/password-reset.repository';
 
-const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
-
 export class PasswordResetService {
-  constructor(
-    private readonly repository: PasswordResetRepository,
-  ) {}
+  constructor(private readonly repository: PasswordResetRepository) {}
 
   async createToken(identityId: string): Promise<string> {
     const token = generatePasswordResetToken();
@@ -21,53 +18,29 @@ export class PasswordResetService {
     await this.repository.create(
       identityId,
       tokenHash,
-      new Date(Date.now() + RESET_TOKEN_TTL_MS),
+      new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL_MS),
     );
 
     return token;
   }
 
-	async consumeToken(token: string): Promise<boolean> {
-		const tokenHash = hashPasswordResetToken(token);
+  async consumeToken(token: string): Promise<boolean> {
+    const tokenHash = hashPasswordResetToken(token);
 
-		const record = await this.repository.findValidToken(
-			tokenHash,
-			new Date(),
-		);
+    const record = await this.repository.findValidToken(tokenHash, new Date());
 
-		if (!record) {
-			return false;
-		}
+    if (!record) {
+      return false;
+    }
 
-		await this.repository.consume(record.id);
+    await this.repository.consume(record.id);
 
-		return true;
-	}
+    return true;
+  }
 
-	async resetPassword(
-		token: string,
-		newPassword: string,
-	): Promise<boolean> {
-		const tokenHash = hashPasswordResetToken(token);
-
-		const record = await this.repository.findValidToken(
-			tokenHash,
-			new Date(),
-		);
-
-		if (!record) {
-			return false;
-		}
-
-		const passwordHash = await hashPassword(newPassword);
-
-		await this.repository.updatePassword(
-			record.identityId,
-			passwordHash,
-		);
-
-		await this.repository.consume(record.id);
-
-		return true;
-	}
+  async resetPassword(token: string, newPassword: string): Promise<boolean> {
+    const tokenHash = hashPasswordResetToken(token);
+    const passwordHash = await hashPassword(newPassword);
+    return this.repository.resetPassword(tokenHash, passwordHash, new Date());
+  }
 }

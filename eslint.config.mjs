@@ -9,10 +9,11 @@ export default tseslint.config(
       '**/node_modules/**',
       '**/dist/**',
       '**/.next/**',
+      '**/.next-e2e/**',
       '**/coverage/**',
       '**/playwright-report/**',
       '**/test-results/**',
-      "**/next-env.d.ts"
+      '**/next-env.d.ts',
     ],
   },
   eslint.configs.recommended,

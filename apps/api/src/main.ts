@@ -11,7 +11,6 @@ async function bootstrap(): Promise<void> {
   app.use(cookieParser());
 
   await app.listen(config.port, config.host);
-
 }
 
 void bootstrap();

@@ -12,15 +12,13 @@ describe('AuthService', () => {
 
     const throttle = {} as AuthThrottleService;
 
-const service = new AuthService(repository, throttle);
+    const service = new AuthService(repository, throttle);
 
     const result = await service.createSession('identity-id');
 
     expect(result.token).toBeTruthy();
     expect(result.expiresAt.getTime()).toBeGreaterThan(Date.now());
-    expect(result.absoluteExpiresAt.getTime()).toBeGreaterThan(
-      result.expiresAt.getTime(),
-    );
+    expect(result.absoluteExpiresAt.getTime()).toBeGreaterThan(result.expiresAt.getTime());
 
     expect(repository.createSession).toHaveBeenCalledOnce();
   });
@@ -34,7 +32,7 @@ const service = new AuthService(repository, throttle);
 
     const throttle = {} as AuthThrottleService;
 
-const service = new AuthService(repository, throttle);
+    const service = new AuthService(repository, throttle);
 
     await expect(service.validateSession('token')).resolves.toEqual(session);
     expect(repository.findValidSession).toHaveBeenCalledWith('token');
@@ -47,13 +45,12 @@ const service = new AuthService(repository, throttle);
 
     const throttle = {} as AuthThrottleService;
 
-const service = new AuthService(repository, throttle);
+    const service = new AuthService(repository, throttle);
 
     await service.revokeSession('token');
 
     expect(repository.revokeSession).toHaveBeenCalledWith('token');
   });
-
 
   it('rejects an expired session', async () => {
     const repository = {
@@ -64,13 +61,9 @@ const service = new AuthService(repository, throttle);
 
     const service = new AuthService(repository, throttle);
 
-    await expect(
-      service.validateSession('expired-token'),
-    ).resolves.toBeNull();
+    await expect(service.validateSession('expired-token')).resolves.toBeNull();
 
-    expect(repository.findValidSession).toHaveBeenCalledWith(
-      'expired-token',
-    );
+    expect(repository.findValidSession).toHaveBeenCalledWith('expired-token');
   });
 
   it('rejects a revoked session', async () => {
@@ -82,12 +75,8 @@ const service = new AuthService(repository, throttle);
 
     const service = new AuthService(repository, throttle);
 
-    await expect(
-      service.validateSession('revoked-token'),
-    ).resolves.toBeNull();
+    await expect(service.validateSession('revoked-token')).resolves.toBeNull();
 
-    expect(repository.findValidSession).toHaveBeenCalledWith(
-      'revoked-token',
-    );
+    expect(repository.findValidSession).toHaveBeenCalledWith('revoked-token');
   });
 });

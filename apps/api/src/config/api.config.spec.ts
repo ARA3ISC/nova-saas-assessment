@@ -14,7 +14,9 @@ describe('api config', () => {
     const original = process.env.DATABASE_URL;
     delete process.env.DATABASE_URL;
 
-    expect(() => loadDatabaseConfig()).toThrow('Missing required environment variable: DATABASE_URL');
+    expect(() => loadDatabaseConfig()).toThrow(
+      'Missing required environment variable: DATABASE_URL',
+    );
 
     if (original === undefined) {
       delete process.env.DATABASE_URL;

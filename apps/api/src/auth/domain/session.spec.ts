@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  generateSessionToken,
-  hashSessionToken,
-} from './session';
+import { generateSessionToken, hashSessionToken } from './session';
 
 describe('session tokens', () => {
   it('generates a non-empty opaque token', () => {

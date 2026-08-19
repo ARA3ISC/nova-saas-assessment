@@ -58,6 +58,24 @@ enum InvitationKind {
   COLLABORATOR
 }
 
+enum TransactionalEmailTemplate {
+  INITIAL_OWNER_INVITATION_V1
+  COLLABORATOR_INVITATION_V1
+  PASSWORD_RESET_V1
+}
+
+enum OutboxMessageStatus {
+  PENDING
+  DELIVERED
+  EXPIRED
+}
+
+enum OwnershipTransferStatus {
+  PENDING
+  ACCEPTED
+  CANCELLED
+}
+
 model Identity {
   id              String         @id @default(uuid()) @db.Uuid
   email           String
@@ -149,19 +167,64 @@ model Organization {
   name             String
   accessStatus     OrganizationAccessStatus @default(PROVISIONING)
   commercialStatus CommercialStatus         @default(DEMO)
+  version          Int                      @default(1)
 
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
   disabledAt DateTime?
 
-  companies      Company[]
-  memberships    Membership[]
-  ownership      OrganizationOwnership?
-  businessScopes BusinessScope[]
-  invitations    Invitation[]
+  companies                  Company[]
+  memberships                Membership[]
+  ownership                  OrganizationOwnership?
+  businessScopes             BusinessScope[]
+  invitations                Invitation[]
+  outboxMessages             OutboxMessage[]
+  ownershipTransferProposals OwnershipTransferProposal[]
+  capabilityGrants           CapabilityGrant[]
+  auditEvidence              AuditEvidence[]
+  permissionPresetVersions   PermissionPresetVersion[]
 
   @@index([accessStatus])
   @@index([commercialStatus])
+}
+
+model OwnershipTransferProposal {
+  id                    String                  @id @default(uuid()) @db.Uuid
+  organizationId        String                  @db.Uuid
+  proposerMembershipId  String                  @db.Uuid
+  successorMembershipId String                  @db.Uuid
+  status                OwnershipTransferStatus @default(PENDING)
+  expiresAt             DateTime
+  acceptedAt            DateTime?
+  cancelledAt           DateTime?
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  organization          Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  proposer              Membership              @relation("OwnershipTransferProposer", fields: [organizationId, proposerMembershipId], references: [organizationId, id], onDelete: Restrict)
+  successor             Membership              @relation("OwnershipTransferSuccessor", fields: [organizationId, successorMembershipId], references: [organizationId, id], onDelete: Restrict)
+
+  @@index([organizationId, status])
+}
+
+model OutboxMessage {
+  id                String                     @id @default(uuid()) @db.Uuid
+  organizationId    String?                    @db.Uuid
+  recipient         String
+  template          TransactionalEmailTemplate
+  deliveryKey       String                     @unique
+  encryptedEnvelope String
+  status            OutboxMessageStatus        @default(PENDING)
+  attemptCount      Int                        @default(0)
+  providerMessageId String?
+  lastFailureCode   String?
+  deliveredAt       DateTime?
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@index([status, createdAt])
 }
 
 model Membership {
@@ -171,8 +234,9 @@ model Membership {
   profile        OrganizationProfile
   status         MembershipStatus    @default(ACTIVE)
 
-  accessEpoch Int @default(0)
-  version     Int @default(1)
+  accessEpoch            Int     @default(0)
+  version                Int     @default(1)
+  organizationWideAccess Boolean @default(false)
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -183,7 +247,12 @@ model Membership {
 
   identity Identity @relation(fields: [identityId], references: [id], onDelete: Cascade)
 
-  ownership OrganizationOwnership?
+  ownership                   OrganizationOwnership?
+  proposedOwnershipTransfers  OwnershipTransferProposal[] @relation("OwnershipTransferProposer")
+  successorOwnershipTransfers OwnershipTransferProposal[] @relation("OwnershipTransferSuccessor")
+  capabilityGrants            CapabilityGrant[]
+  companyGrants               CompanyGrant[]
+  businessScopeGrants         BusinessScopeGrant[]
 
   @@unique([organizationId, id])
   @@unique([organizationId, identityId])
@@ -207,26 +276,113 @@ model OrganizationOwnership {
 }
 
 model Invitation {
-  id             String         @id @default(uuid()) @db.Uuid
-  organizationId String         @db.Uuid
-  email          String
-  normalizedEmail String
-  tokenHash      String         @unique
-  kind           InvitationKind
-  targetProfile  OrganizationProfile
-  expiresAt      DateTime
-  consumedAt     DateTime?
-  revokedAt      DateTime?
+  id                     String              @id @default(uuid()) @db.Uuid
+  organizationId         String              @db.Uuid
+  email                  String
+  normalizedEmail        String
+  tokenHash              String              @unique
+  kind                   InvitationKind
+  targetProfile          OrganizationProfile
+  capabilities           Json                @default("[]")
+  companyIds             Json                @default("[]")
+  businessScopeIds       Json                @default("[]")
+  organizationWideAccess Boolean             @default(false)
+  expiresAt              DateTime
+  consumedAt             DateTime?
+  revokedAt              DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  @@index([organizationId, normalizedEmail, kind])
   @@unique([organizationId, id])
+  @@index([organizationId, normalizedEmail, kind])
   @@index([organizationId, normalizedEmail])
   @@index([organizationId, expiresAt])
+}
+
+model CapabilityGrant {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  membershipId   String       @db.Uuid
+  capability     String
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  membership     Membership   @relation(fields: [organizationId, membershipId], references: [organizationId, id], onDelete: Cascade)
+
+  @@unique([organizationId, membershipId, capability])
+  @@index([organizationId, membershipId])
+}
+
+model AuditEvidence {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  actorId        String       @db.Uuid
+  action         String
+  reason         String
+  subjectType    String
+  subjectId      String       @db.Uuid
+  correlationId  String       @default(uuid()) @db.Uuid
+  before         Json
+  after          Json
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([correlationId])
+}
+
+model CapabilityDefinition {
+  id           String   @id @default(uuid()) @db.Uuid
+  key          String   @unique
+  label        String
+  scopeType    String
+  active       Boolean  @default(true)
+  platformOnly Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model PermissionPresetVersion {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  key            String
+  label          String
+  version        Int
+  capabilities   Json     @default("[]")
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, key, version])
+  @@index([organizationId, active])
+}
+
+model CompanyGrant {
+  id             String     @id @default(uuid()) @db.Uuid
+  organizationId String     @db.Uuid
+  membershipId   String     @db.Uuid
+  companyId      String     @db.Uuid
+  createdAt      DateTime   @default(now())
+  membership     Membership @relation(fields: [organizationId, membershipId], references: [organizationId, id], onDelete: Cascade)
+  company        Company    @relation(fields: [organizationId, companyId], references: [organizationId, id], onDelete: Cascade)
+
+  @@unique([organizationId, membershipId, companyId])
+}
+
+model BusinessScopeGrant {
+  id              String        @id @default(uuid()) @db.Uuid
+  organizationId  String        @db.Uuid
+  membershipId    String        @db.Uuid
+  businessScopeId String        @db.Uuid
+  createdAt       DateTime      @default(now())
+  membership      Membership    @relation(fields: [organizationId, membershipId], references: [organizationId, id], onDelete: Cascade)
+  businessScope   BusinessScope @relation(fields: [organizationId, businessScopeId], references: [organizationId, id], onDelete: Cascade)
+
+  @@unique([organizationId, membershipId, businessScopeId])
 }
 
 model Company {
@@ -234,6 +390,7 @@ model Company {
   organizationId String        @db.Uuid
   name           String
   status         CompanyStatus @default(ACTIVE)
+  version        Int           @default(1)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -241,6 +398,7 @@ model Company {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   businessScopes BusinessScope[]
+  grants         CompanyGrant[]
 
   @@unique([organizationId, id])
   @@unique([organizationId, name])
@@ -252,23 +410,27 @@ model BusinessScope {
   organizationId String @db.Uuid
   companyId      String @db.Uuid
 
-  type               BusinessScopeType
-  name               String
-  normalizedName     String
-  externalIdentifier String?
-  location           String?
-  responsiblePerson  String?
-  status             BusinessScopeStatus @default(ACTIVE)
+  type                         BusinessScopeType
+  name                         String
+  normalizedName               String
+  externalIdentifier           String?
+  normalizedExternalIdentifier String?
+  location                     String?
+  responsiblePerson            String?
+  sectorCounterpart            String?
+  status                       BusinessScopeStatus @default(ACTIVE)
+  version                      Int                 @default(1)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  company Company @relation(fields: [organizationId, companyId], references: [organizationId, id], onDelete: Cascade)
+  company Company              @relation(fields: [organizationId, companyId], references: [organizationId, id], onDelete: Cascade)
+  grants  BusinessScopeGrant[]
 
   @@unique([organizationId, id])
-  @@unique([organizationId, companyId, type, normalizedName, externalIdentifier])
+  @@unique([organizationId, companyId, type, normalizedName, normalizedExternalIdentifier])
   @@index([organizationId, companyId, status])
   @@index([organizationId, normalizedName])
 }

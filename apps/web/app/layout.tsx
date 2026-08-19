@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'NOVA',
-  description: 'NOVA SaaS platform scaffold',
+  description: 'NOVA organization administration',
 };
 
 export default function RootLayout({

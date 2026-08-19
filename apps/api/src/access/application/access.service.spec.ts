@@ -1,9 +1,4 @@
-import {
-  describe,
-  expect,
-  it,
-  vi,
-} from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { AccessService } from './access.service';
 
@@ -24,6 +19,7 @@ describe('AccessService', () => {
       profile: 'Administrator',
       status: 'ACTIVE',
       accessEpoch: 3,
+      organizationWideAccess: false,
       identity: {
         id: 'identity-id',
         status: 'ACTIVE',
@@ -35,28 +31,24 @@ describe('AccessService', () => {
     });
 
     const service = new AccessService(
-      repository as unknown as ConstructorParameters<
-        typeof AccessService
-      >[0],
+      repository as unknown as ConstructorParameters<typeof AccessService>[0],
     );
 
-    await expect(
-      service.resolveEffectiveAccess('identity-id'),
-    ).resolves.toEqual({
+    await expect(service.resolveEffectiveAccess('identity-id')).resolves.toEqual({
       identityId: 'identity-id',
       organizationId: 'organization-id',
       membershipId: 'membership-id',
       profile: 'Administrator',
       accessEpoch: 3,
+      organizationWideAccess: false,
+      capabilities: [],
+      companyIds: [],
+      businessScopeIds: [],
     });
 
-    expect(
-      repository.findEffectiveAccess,
-    ).toHaveBeenCalledOnce();
+    expect(repository.findEffectiveAccess).toHaveBeenCalledOnce();
 
-    expect(
-      repository.findEffectiveAccess,
-    ).toHaveBeenCalledWith('identity-id');
+    expect(repository.findEffectiveAccess).toHaveBeenCalledWith('identity-id');
   });
 
   it('rejects an identity without a membership', async () => {
@@ -65,14 +57,10 @@ describe('AccessService', () => {
     repository.findEffectiveAccess.mockResolvedValue(null);
 
     const service = new AccessService(
-      repository as unknown as ConstructorParameters<
-        typeof AccessService
-      >[0],
+      repository as unknown as ConstructorParameters<typeof AccessService>[0],
     );
 
-    await expect(
-      service.resolveEffectiveAccess('identity-id'),
-    ).rejects.toThrow('Access denied');
+    await expect(service.resolveEffectiveAccess('identity-id')).rejects.toThrow('Access denied');
   });
 
   it('rejects a disabled identity', async () => {
@@ -96,14 +84,10 @@ describe('AccessService', () => {
     });
 
     const service = new AccessService(
-      repository as unknown as ConstructorParameters<
-        typeof AccessService
-      >[0],
+      repository as unknown as ConstructorParameters<typeof AccessService>[0],
     );
 
-    await expect(
-      service.resolveEffectiveAccess('identity-id'),
-    ).rejects.toThrow('Access denied');
+    await expect(service.resolveEffectiveAccess('identity-id')).rejects.toThrow('Access denied');
   });
 
   it('rejects a suspended membership', async () => {
@@ -127,14 +111,10 @@ describe('AccessService', () => {
     });
 
     const service = new AccessService(
-      repository as unknown as ConstructorParameters<
-        typeof AccessService
-      >[0],
+      repository as unknown as ConstructorParameters<typeof AccessService>[0],
     );
 
-    await expect(
-      service.resolveEffectiveAccess('identity-id'),
-    ).rejects.toThrow('Access denied');
+    await expect(service.resolveEffectiveAccess('identity-id')).rejects.toThrow('Access denied');
   });
 
   it('rejects an inaccessible organization', async () => {
@@ -158,13 +138,9 @@ describe('AccessService', () => {
     });
 
     const service = new AccessService(
-      repository as unknown as ConstructorParameters<
-        typeof AccessService
-      >[0],
+      repository as unknown as ConstructorParameters<typeof AccessService>[0],
     );
 
-    await expect(
-      service.resolveEffectiveAccess('identity-id'),
-    ).rejects.toThrow('Access denied');
+    await expect(service.resolveEffectiveAccess('identity-id')).rejects.toThrow('Access denied');
   });
 });

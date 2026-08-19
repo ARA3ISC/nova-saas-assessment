@@ -10,7 +10,12 @@
     "test": "cd ../.. && vitest run --config vitest.config.ts apps/api",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "prisma:seed": "ts-node prisma/seed.ts",
+    "platform:bootstrap": "ts-node src/platform/bootstrap.ts",
     "postinstall": "prisma generate"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.11",

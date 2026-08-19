@@ -1,0 +1,1 @@
+ALTER TYPE "OutboxMessageStatus" ADD VALUE IF NOT EXISTS 'EXPIRED';

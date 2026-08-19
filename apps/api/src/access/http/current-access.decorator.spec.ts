@@ -1,12 +1,7 @@
-import {
-  ExecutionContext,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { describe, expect, it } from 'vitest';
 
-import {
-  getCurrentAccess,
-} from './current-access.decorator';
+import { getCurrentAccess } from './current-access.decorator';
 
 function createContext(request: Record<string, unknown>) {
   return {
@@ -30,16 +25,12 @@ describe('CurrentAccess', () => {
       effectiveAccess: access,
     });
 
-    expect(
-      getCurrentAccess(context),
-    ).toEqual(access);
+    expect(getCurrentAccess(context)).toEqual(access);
   });
 
   it('rejects requests without effective access', () => {
     const context = createContext({});
 
-    expect(() =>
-      getCurrentAccess(context),
-    ).toThrow(UnauthorizedException);
+    expect(() => getCurrentAccess(context)).toThrow(UnauthorizedException);
   });
 });

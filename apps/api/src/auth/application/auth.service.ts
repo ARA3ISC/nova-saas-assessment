@@ -2,14 +2,15 @@ import { AuthThrottleService } from './auth.throttle';
 import { Injectable } from '@nestjs/common';
 import { normalizeEmail } from '../domain/email';
 import * as argon2 from 'argon2';
+import { hashPassword } from '../../identity/domain/password';
 
-import {
-  generateSessionToken,
-} from '../domain/session';
+import { generateSessionToken } from '../domain/session';
 import { AuthRepository } from '../infrastructure/auth.repository';
 
-const SESSION_TTL_MS = 1000 * 60 * 60 * 24;
-const ABSOLUTE_SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
+const SESSION_TTL_MS = 30 * 60 * 1000;
+const ABSOLUTE_SESSION_TTL_MS = 12 * 60 * 60 * 1000;
+const TIMING_EQUALIZER_HASH =
+  '$argon2id$v=19$m=19456,p=1,t=2$s3+6LGp1YqdsuFKSO87dOA$hluUu/kQ1U8TweMP+4Ym5mPaLWulcXeW95aHbnquFlQ';
 
 @Injectable()
 export class AuthService {
@@ -27,9 +28,7 @@ export class AuthService {
     const now = new Date();
 
     const expiresAt = new Date(now.getTime() + SESSION_TTL_MS);
-    const absoluteExpiresAt = new Date(
-      now.getTime() + ABSOLUTE_SESSION_TTL_MS,
-    );
+    const absoluteExpiresAt = new Date(now.getTime() + ABSOLUTE_SESSION_TTL_MS);
 
     await this.authRepository.createSession({
       identityId,
@@ -54,39 +53,50 @@ export class AuthService {
     await this.authRepository.revokeSession(token);
   }
 
-	async login(email: string, password: string) {
-		const normalizedEmail = normalizeEmail(email);
+  async getIdentityContext(identityId: string) {
+    return this.authRepository.findIdentityContext(identityId);
+  }
 
-    if (
-      await this.authThrottle.isLocked(normalizedEmail, 'login')
-    ) {
+  async login(email: string, password: string, sourceBucket: string) {
+    const normalizedEmail = normalizeEmail(email);
+
+    if (await this.authThrottle.isLocked(normalizedEmail, sourceBucket)) {
+      await argon2.verify(TIMING_EQUALIZER_HASH, password).catch(() => false);
       return null;
     }
 
-		const identity =
-			await this.authRepository.findIdentityByEmail(normalizedEmail);
+    const identity = await this.authRepository.findIdentityByEmail(normalizedEmail);
 
-		if (
-			!identity ||
-			identity.status !== 'ACTIVE' ||
-			!identity.passwordCredential
-		) {
-			return null;
-		}
+    if (!identity || identity.status !== 'ACTIVE' || !identity.passwordCredential) {
+      await argon2.verify(TIMING_EQUALIZER_HASH, password).catch(() => false);
+      await this.authThrottle.recordFailure(normalizedEmail, sourceBucket);
+      return null;
+    }
 
-		const valid = await argon2.verify(
-      identity.passwordCredential.passwordHash,
-      password,
-    );
+    const valid = await argon2.verify(identity.passwordCredential.passwordHash, password);
 
     if (!valid) {
-      await this.authThrottle.recordFailure(normalizedEmail, 'login');
+      await this.authThrottle.recordFailure(normalizedEmail, sourceBucket);
       return null;
     }
 
-    await this.authThrottle.clearFailures(normalizedEmail, 'login');
+    // A legitimate login clears only that account's failures. Shared source
+    // failures remain independent and expire through their own time window.
+    await this.authThrottle.clearAccountFailures(normalizedEmail);
 
+    return {
+      ...(await this.createSession(identity.id)),
+      mustChangePassword: identity.passwordCredential.mustChangePassword,
+    };
+  }
 
-		return this.createSession(identity.id);
-	}
+  async completeRequiredPasswordChange(identityId: string, password: string) {
+    const passwordHash = await hashPassword(password);
+    const changed = await this.authRepository.completeRequiredPasswordChange(
+      identityId,
+      passwordHash,
+    );
+    if (!changed) return null;
+    return this.createSession(identityId);
+  }
 }
