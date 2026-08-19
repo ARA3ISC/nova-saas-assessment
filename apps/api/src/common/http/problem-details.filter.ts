@@ -32,6 +32,7 @@ export class ProblemDetailsFilter implements ExceptionFilter {
     const correlationId = request.correlationId ?? 'correlation-unavailable';
     const detail = isHttp ? this.safeDetail(exception) : 'The request could not be completed.';
 
+
     this.logger.warn(
       JSON.stringify({
         event: 'http.request.failed',

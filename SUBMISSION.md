@@ -89,7 +89,8 @@ The production build completes successfully. It currently reports non-blocking w
 
 Loom URL:
 
-`TO_BE_ADDED`
+`https://www.loom.com/share/9e051e1017604c7ea85bde47e0eafed5`
+`https://www.loom.com/share/b1ab929ec990479d94969fb7b85be9bd`
 
 The demonstration covers:
 
